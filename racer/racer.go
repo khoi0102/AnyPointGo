@@ -70,12 +70,12 @@ func RaceLap(c echo.Context) error {
 	}
 
 	if lastToken, ok := races[raceID]; ok {
-		bodyBytes, err := io.ReadAll(c.Request().Body)
+		IncomingToken, err := io.ReadAll(c.Request().Body)
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, "failed to read request body")
 		}
 
-		newToken := string(bodyBytes)
+		newToken := string(IncomingToken)
 		races[raceID] = newToken
 
 		return c.JSON(http.StatusOK, Raced{
