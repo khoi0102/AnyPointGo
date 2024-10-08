@@ -87,20 +87,29 @@ func RaceLap(c echo.Context) error {
 	return c.JSON(http.StatusNotFound, "race not found")
 }
 func Temperature(c echo.Context) error {
+	bodyBytes, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		fmt.Println("Failed to read request body:", err)
+		return c.JSON(http.StatusBadRequest, "Failed to read request body")
+	}
+
 	var tempData []TemperatureData
-	if err := json.NewDecoder(c.Request().Body).Decode(&tempData); err != nil {
-		fmt.Println("Failed to decode request body:", err)
+	if err := json.Unmarshal(bodyBytes, &tempData); err != nil {
+		fmt.Printf("Failed to decode request body: %v\nBody: %s\n", err, string(bodyBytes))
 		return c.JSON(http.StatusBadRequest, "Failed to decode request body")
 	}
+
 	stationTemps := make(map[string][]float64)
 	for _, data := range tempData {
 		stationTemps[data.Station] = append(stationTemps[data.Station], data.Temperature)
 	}
+
 	var stationNames []string
 	for station := range stationTemps {
 		stationNames = append(stationNames, station)
 	}
 	sort.Strings(stationNames)
+
 	var stationAverages []StationAvg
 	for _, station := range stationNames {
 		temps := stationTemps[station]
@@ -114,6 +123,7 @@ func Temperature(c echo.Context) error {
 			AverageTemp: math.Round(avg*100000) / 100000,
 		})
 	}
+
 	response := TemperatureResponse{
 		RacerID:  "9e1f0369-3d77-4652-b508-83c4330b2267",
 		Averages: stationAverages,
