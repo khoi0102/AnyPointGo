@@ -87,6 +87,12 @@ func RaceLap(c echo.Context) error {
 	return c.JSON(http.StatusNotFound, "race not found")
 }
 func Temperature(c echo.Context) error {
+	if c.Request().Header.Get("Content-Encoding") == "gzip" {
+		fmt.Println("it has a gzip file")
+	} else {
+		fmt.Println("it does not contain a gzip file")
+	}
+
 	bodyBytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		fmt.Println("Failed to read request body:", err)
