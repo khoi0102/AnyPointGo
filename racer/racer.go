@@ -90,6 +90,7 @@ func RaceLap(c echo.Context) error {
 func Temperature(c echo.Context) error {
 	var bodyReader io.Reader = c.Request().Body
 	if c.Request().Header.Get("Content-Encoding") == "gzip" {
+		fmt.Printf("Decoding gzip body\n")
 		gzipReader, err := gzip.NewReader(c.Request().Body)
 		if err != nil {
 			fmt.Println("Failed to create gzip reader:", err)
