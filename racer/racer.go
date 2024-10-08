@@ -1,6 +1,7 @@
 package racer
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
@@ -87,13 +88,18 @@ func RaceLap(c echo.Context) error {
 	return c.JSON(http.StatusNotFound, "race not found")
 }
 func Temperature(c echo.Context) error {
+	var bodyReader io.Reader = c.Request().Body
 	if c.Request().Header.Get("Content-Encoding") == "gzip" {
-		fmt.Println("it has a gzip file")
-	} else {
-		fmt.Println("it does not contain a gzip file")
+		gzipReader, err := gzip.NewReader(c.Request().Body)
+		if err != nil {
+			fmt.Println("Failed to create gzip reader:", err)
+			return c.JSON(http.StatusBadRequest, "Failed to create gzip reader")
+		}
+		defer gzipReader.Close()
+		bodyReader = gzipReader
 	}
 
-	bodyBytes, err := io.ReadAll(c.Request().Body)
+	bodyBytes, err := io.ReadAll(bodyReader)
 	if err != nil {
 		fmt.Println("Failed to read request body:", err)
 		return c.JSON(http.StatusBadRequest, "Failed to read request body")
