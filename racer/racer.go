@@ -90,57 +90,44 @@ func RaceLap(c echo.Context) error {
 func Temperature(c echo.Context) error {
 	var bodyReader io.Reader = c.Request().Body
 	if c.Request().Header.Get("Content-Encoding") == "gzip" {
-		fmt.Printf("Decoding gzip body\n")
-		gzipReader, err := gzip.NewReader(c.Request().Body)
+		gzipReader, err := gzip.NewReader(bodyReader)
 		if err != nil {
-			fmt.Println("Failed to create gzip reader:", err)
 			return c.JSON(http.StatusBadRequest, "Failed to create gzip reader")
 		}
 		defer gzipReader.Close()
 		bodyReader = gzipReader
 	}
+	decoder := json.NewDecoder(bodyReader)
+	stationSums := make(map[string]float64)
+	stationCounts := make(map[string]int)
 
-	bodyBytes, err := io.ReadAll(bodyReader)
-	if err != nil {
-		fmt.Println("Failed to read request body:", err)
-		return c.JSON(http.StatusBadRequest, "failed to read request body")
-	}
+	for decoder.More() {
+		var tempData TemperatureData
+		if err := decoder.Decode(&tempData); err != nil {
+			return c.JSON(http.StatusBadRequest, "cant decode request body")
+		}
 
-	var tempData []TemperatureData
-	if err := json.Unmarshal(bodyBytes, &tempData); err != nil {
-		fmt.Printf("Failed to decode request body: %v\nBody: %s\n", err, string(bodyBytes))
-		return c.JSON(http.StatusBadRequest, "Failed to decode request body")
+		stationSums[tempData.Station] += tempData.Temperature
+		stationCounts[tempData.Station]++
 	}
-
-	stationTemps := make(map[string][]float64)
-	for _, data := range tempData {
-		stationTemps[data.Station] = append(stationTemps[data.Station], data.Temperature)
-	}
-
-	var stationNames []string
-	for station := range stationTemps {
-		stationNames = append(stationNames, station)
-	}
-	sort.Strings(stationNames)
 
 	var stationAverages []StationAvg
-	for _, station := range stationNames {
-		temps := stationTemps[station]
-		sum := 0.0
-		for _, temp := range temps {
-			sum += temp
-		}
-		avg := sum / float64(len(temps))
+	for station, sum := range stationSums {
+		count := stationCounts[station]
+		avg := sum / float64(count)
 		stationAverages = append(stationAverages, StationAvg{
 			Station:     station,
-			AverageTemp: math.Round(avg*100000) / 100000,
+			AverageTemp: math.Round(avg*100000) / 100000, // Round to 5 decimal places
 		})
 	}
+
+	sort.Slice(stationAverages, func(i, j int) bool {
+		return stationAverages[i].Station < stationAverages[j].Station
+	})
 
 	response := TemperatureResponse{
 		RacerID:  "9e1f0369-3d77-4652-b508-83c4330b2267",
 		Averages: stationAverages,
 	}
-
 	return c.JSON(http.StatusOK, response)
 }
