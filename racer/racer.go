@@ -89,6 +89,7 @@ func RaceLap(c echo.Context) error {
 }
 
 func Temperature(c echo.Context) error {
+
 	var bodyReader io.Reader = c.Request().Body
 	if c.Request().Header.Get("Content-Encoding") == "gzip" {
 		fmt.Printf("Decoding gzip body\n")
@@ -101,16 +102,29 @@ func Temperature(c echo.Context) error {
 		bodyReader = gzipReader
 	}
 
-	var tempData []TemperatureData
-	if err := json.NewDecoder(bodyReader).Decode(&tempData); err != nil {
-		fmt.Printf("Failed to decode request body: %v\n", err)
-		return c.JSON(http.StatusBadRequest, "Failed to decode request body")
-	}
+	decoder := json.NewDecoder(bodyReader)
 
 	stationTemps := make(map[string][]float64)
-	for _, data := range tempData {
+	count := 0
+
+	for {
+		var data TemperatureData
+		if err := decoder.Decode(&data); err == io.EOF {
+			break
+		} else if err != nil {
+			fmt.Printf("Failed to decode JSON object: %v\n", err)
+			return c.JSON(http.StatusBadRequest, "Failed to decode JSON object")
+		}
+
 		stationTemps[data.Station] = append(stationTemps[data.Station], data.Temperature)
+		count++
+
+		if count%1000000 == 0 {
+			fmt.Printf("Processed %d records\n", count)
+		}
 	}
+
+	fmt.Printf("Finished processing %d records\n", count)
 
 	var stationNames []string
 	for station := range stationTemps {
@@ -137,5 +151,6 @@ func Temperature(c echo.Context) error {
 		Averages: stationAverages,
 	}
 
+	fmt.Println("Returning JSON response")
 	return c.JSON(http.StatusOK, response)
 }
