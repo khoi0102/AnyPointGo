@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"runtime"
 	"sort"
 )
 
@@ -91,7 +92,7 @@ func RaceLap(c echo.Context) error {
 func Temperature(c echo.Context) error {
 	var bodyReader io.Reader = c.Request().Body
 	if c.Request().Header.Get("Content-Encoding") == "gzip" {
-		fmt.Printf("Decoding gzip body\n")
+		fmt.Println("Decoding gzip body")
 		gzipReader, err := gzip.NewReader(c.Request().Body)
 		if err != nil {
 			fmt.Println("Failed to create gzip reader:", err)
@@ -101,16 +102,35 @@ func Temperature(c echo.Context) error {
 		bodyReader = gzipReader
 	}
 
+	if length := c.Request().Header.Get("Content-Length"); length != "" {
+		fmt.Printf("Content-Length: %s bytes\n", length)
+	}
+
+	bodyBytes, err := io.ReadAll(bodyReader)
+	if err != nil {
+		fmt.Println("Failed to read request body:", err)
+		return c.JSON(http.StatusBadRequest, "Failed to read request body")
+	}
+	fmt.Printf("Successfully read %d bytes from request body\n", len(bodyBytes))
+
+	if len(bodyBytes) > 100*1024*1024 { // 100 MB as an example threshold
+		fmt.Println("Warning: Request body is too large for processing")
+		return c.JSON(http.StatusBadRequest, "Request body too large")
+	}
+
 	var tempData []TemperatureData
-	if err := json.NewDecoder(bodyReader).Decode(&tempData); err != nil {
-		fmt.Printf("Failed to decode request body: %v\n", err)
+	if err := json.Unmarshal(bodyBytes, &tempData); err != nil {
+		fmt.Printf("Failed to decode request body: %v\nBody: %s\n", err, string(bodyBytes))
 		return c.JSON(http.StatusBadRequest, "Failed to decode request body")
 	}
+	fmt.Printf("Decoded %d temperature records\n", len(tempData))
 
 	stationTemps := make(map[string][]float64)
 	for _, data := range tempData {
 		stationTemps[data.Station] = append(stationTemps[data.Station], data.Temperature)
 	}
+
+	fmt.Printf("Processed temperatures for %d unique stations\n", len(stationTemps))
 
 	var stationNames []string
 	for station := range stationTemps {
@@ -131,11 +151,17 @@ func Temperature(c echo.Context) error {
 			AverageTemp: math.Round(avg*100000) / 100000,
 		})
 	}
+	fmt.Println("Averages calculation completed")
 
 	response := TemperatureResponse{
 		RacerID:  "9e1f0369-3d77-4652-b508-83c4330b2267",
 		Averages: stationAverages,
 	}
 
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	fmt.Printf("Memory usage - Alloc: %v KB, TotalAlloc: %v KB, Sys: %v KB, NumGC: %v\n", m.Alloc/1024, m.TotalAlloc/1024, m.Sys/1024, m.NumGC)
+
+	fmt.Println("Returning the JSON response")
 	return c.JSON(http.StatusOK, response)
 }
