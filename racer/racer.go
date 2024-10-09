@@ -104,7 +104,6 @@ func Temperature(c echo.Context) error {
 	decoder := json.NewDecoder(bodyReader)
 	stationTemps := make(map[string][]float64)
 
-	// Process each object in the array one by one
 	for {
 		var tempData TemperatureData
 		if err := decoder.Decode(&tempData); err == io.EOF {
