@@ -101,21 +101,20 @@ func Temperature(c echo.Context) error {
 		bodyReader = gzipReader
 	}
 
-	bodyBytes, err := io.ReadAll(bodyReader)
-	if err != nil {
-		fmt.Println("Failed to read request body:", err)
-		return c.JSON(http.StatusBadRequest, "Failed to read request body")
-	}
-
-	var tempData []TemperatureData
-	if err := json.Unmarshal(bodyBytes, &tempData); err != nil {
-		fmt.Printf("Failed to decode request body: %v\nBody: %s\n", err, string(bodyBytes))
-		return c.JSON(http.StatusBadRequest, "Failed to decode request body")
-	}
-
+	decoder := json.NewDecoder(bodyReader)
 	stationTemps := make(map[string][]float64)
-	for _, data := range tempData {
-		stationTemps[data.Station] = append(stationTemps[data.Station], data.Temperature)
+
+	// Process each object in the array one by one
+	for {
+		var tempData TemperatureData
+		if err := decoder.Decode(&tempData); err == io.EOF {
+			break // end of the input
+		} else if err != nil {
+			fmt.Println("Failed to decode request body:", err)
+			return c.JSON(http.StatusBadRequest, "Failed to decode request body")
+		}
+
+		stationTemps[tempData.Station] = append(stationTemps[tempData.Station], tempData.Temperature)
 	}
 
 	var stationNames []string
