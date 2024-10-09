@@ -89,6 +89,7 @@ func RaceLap(c echo.Context) error {
 }
 
 func Temperature(c echo.Context) error {
+	fmt.Println("Starting temperature processing...")
 
 	var bodyReader io.Reader = c.Request().Body
 	if c.Request().Header.Get("Content-Encoding") == "gzip" {
@@ -104,14 +105,17 @@ func Temperature(c echo.Context) error {
 
 	decoder := json.NewDecoder(bodyReader)
 
+	if _, err := decoder.Token(); err != nil {
+		fmt.Printf("Failed to start decoding JSON array: %v\n", err)
+		return c.JSON(http.StatusBadRequest, "Failed to start decoding JSON array")
+	}
+
 	stationTemps := make(map[string][]float64)
 	count := 0
 
-	for {
+	for decoder.More() {
 		var data TemperatureData
-		if err := decoder.Decode(&data); err == io.EOF {
-			break
-		} else if err != nil {
+		if err := decoder.Decode(&data); err != nil {
 			fmt.Printf("Failed to decode JSON object: %v\n", err)
 			return c.JSON(http.StatusBadRequest, "Failed to decode JSON object")
 		}
