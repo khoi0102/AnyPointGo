@@ -103,7 +103,7 @@ func Temperature(c echo.Context) error {
 	bodyBytes, err := io.ReadAll(bodyReader)
 	if err != nil {
 		fmt.Println("Failed to read request body:", err)
-		return c.JSON(http.StatusBadRequest, "Failed to read request body")
+		return c.JSON(http.StatusBadRequest, "failed to read request body")
 	}
 
 	var tempData []TemperatureData
